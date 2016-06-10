@@ -1,5 +1,4 @@
 
-
 //  rt_scheduler.c
 //  rt_scheduler_test
 //
@@ -65,6 +64,12 @@
 
 #define QUANTUM 10000000
 
+
+#define PAD 8
+
+#define MALLOC(x) ({ void *p  = malloc((x)+2*PAD); if (!p) { panic("Failed to Allocate %d bytes\n",x); } memset(p,0,(x)+2*PAD); p+PAD; })
+#define FREE(x) do {free(x-PAD); x=0; } while (0)
+
 typedef struct rt_thread_sim {
     rt_type type;
     queue_type q_type;
@@ -129,7 +134,7 @@ rt_thread* rt_thread_init(int type,
                           struct nk_thread *thread
                           )
 {
-    rt_thread *t = (rt_thread *)malloc(sizeof(rt_thread));
+    rt_thread *t = (rt_thread *)MALLOC(sizeof(rt_thread));
     t->type = type;
     t->status = ARRIVED;
     t->constraints = constraints;
@@ -157,14 +162,14 @@ rt_thread* rt_thread_init(int type,
 }
 
 static rt_list* rt_list_init() {
-    rt_list *list = (rt_list *)malloc(sizeof(rt_list));
+    rt_list *list = (rt_list *)MALLOC(sizeof(rt_list));
     list->head = NULL;
     list->tail = NULL;
     return list;
 }
 
 static rt_node* rt_node_init(rt_thread *t) {
-    rt_node *node = (rt_node *)malloc(sizeof(rt_node));
+    rt_node *node = (rt_node *)MALLOC(sizeof(rt_node));
     node->thread = t;
     node->next = NULL;
     node->prev = NULL;
@@ -271,12 +276,12 @@ void wake_up_all(rt_thread *A) {
 
 rt_scheduler* rt_scheduler_init(rt_thread *main_thread)
 {
-    rt_scheduler* scheduler = (rt_scheduler *)malloc(sizeof(rt_scheduler));
-    rt_queue *runnable = (rt_queue *)malloc(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
-    rt_queue *pending = (rt_queue *)malloc(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
-    rt_queue *aperiodic = (rt_queue *)malloc(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
+    rt_scheduler* scheduler = (rt_scheduler *)MALLOC(sizeof(rt_scheduler));
+    rt_queue *runnable = (rt_queue *)MALLOC(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
+    rt_queue *pending = (rt_queue *)MALLOC(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
+    rt_queue *aperiodic = (rt_queue *)MALLOC(sizeof(rt_queue) + MAX_QUEUE * sizeof(rt_thread *));
 
-    tsc_info *info = (tsc_info *)malloc(sizeof(tsc_info));
+    tsc_info *info = (tsc_info *)MALLOC(sizeof(tsc_info));
 
 	scheduler->main_thread = main_thread;
 
@@ -324,10 +329,10 @@ rt_scheduler* rt_scheduler_init(rt_thread *main_thread)
 }
 
 static rt_simulator* init_simulator() {
-    rt_simulator* simulator = (rt_simulator *)malloc(sizeof(rt_simulator));
-    rt_queue_sim *runnable = (rt_queue_sim *)malloc(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
-    rt_queue_sim *pending = (rt_queue_sim *)malloc(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
-    rt_queue_sim *aperiodic = (rt_queue_sim *)malloc(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
+    rt_simulator* simulator = (rt_simulator *)MALLOC(sizeof(rt_simulator));
+    rt_queue_sim *runnable = (rt_queue_sim *)MALLOC(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
+    rt_queue_sim *pending = (rt_queue_sim *)MALLOC(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
+    rt_queue_sim *aperiodic = (rt_queue_sim *)MALLOC(sizeof(rt_queue_sim) + MAX_QUEUE * sizeof(rt_thread_sim *));
 
     if (!simulator || !runnable || ! pending || !aperiodic) {
         RT_SCHED_ERROR("Could not allocate rt simulator\n");
@@ -1016,9 +1021,9 @@ static int check_deadlines(rt_thread *t)
 {
 	
     if (t->exit_time > t->deadline) {
-        // RT_SCHED_ERROR("Missed Deadline = %llu\t\t Current Timer = %llu\n", t->deadline, t->exit_time);
-        // RT_SCHED_ERROR("Difference =  %llu\n", t->exit_time - t->deadline);
-        // rt_thread_dump(t);
+        RT_SCHED_ERROR("Missed Deadline = %llu\t\t Current Timer = %llu\n", t->deadline, t->exit_time);
+        RT_SCHED_ERROR("Difference =  %llu\n", t->exit_time - t->deadline);
+        rt_thread_dump(t);
 		return 1;
     }
     return 0;
@@ -1169,7 +1174,7 @@ static void test_real_time(void *in)
 {
     while (1)
     {
-        printk("Inside thread %d\n", *(int *)in);
+      printk("Inside thread %d\n", (int)(uint64_t)in);
         udelay(10000);
     }
 }
@@ -1178,7 +1183,7 @@ void rt_start(uint64_t sched_slice_time, uint64_t sched_period) {
 
     nk_thread_id_t sched;
 
-    rt_constraints *c = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *c = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints p = {sched_period, sched_slice_time};
     c->periodic = p;
 
@@ -1193,35 +1198,35 @@ void rt_start(uint64_t sched_slice_time, uint64_t sched_period) {
     nk_thread_id_t x;
     nk_thread_id_t y;
     
-    rt_constraints *constraints_first = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_first = {(10000000000), (10000000)};
+    rt_constraints *constraints_first = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_first = {(100000000), (10000000)};
     constraints_first->periodic = per_constr_first;
     
-    rt_constraints *constraints_second = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_second = {(5000000000), (5000000)};
+    rt_constraints *constraints_second = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_second = {(50000000), (5000000)};
     constraints_second->periodic = per_constr_second;
     
-    rt_constraints *constraints_third = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_third = {(250000000), (250000)};
+    rt_constraints *constraints_third = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_third = {(2500000), (250000)};
     constraints_third->periodic = per_constr_third;
     
-    rt_constraints *constraints_fifth = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_fifth = {(500000000), (5000000)};
+    rt_constraints *constraints_fifth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_fifth = {(50000000), (5000000)};
     constraints_fifth->periodic = per_constr_fifth;
     
-    rt_constraints *constraints_six = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_six = {(5000000000), (5000000)};
+    rt_constraints *constraints_six = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_six = {(50000000), (5000000)};
     constraints_six->periodic = per_constr_six;
     
-    rt_constraints *constraints_seven = (rt_constraints *)malloc(sizeof(rt_constraints));
-    struct periodic_constraints per_constr_seven = {(5000000000), (5000000)};
+    rt_constraints *constraints_seven = (rt_constraints *)MALLOC(sizeof(rt_constraints));
+    struct periodic_constraints per_constr_seven = {(500000000), (5000000)};
     constraints_seven->periodic = per_constr_seven;
     
-    rt_constraints *constraints_fourth = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_fourth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct aperiodic_constraints aper_constr = {2};
     constraints_fourth->aperiodic = aper_constr;
     
-    rt_constraints *constraints_eighth = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_eighth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_eighth = {(500000000000), (500000000)};
     constraints_eighth->periodic = per_constr_eighth;
 
@@ -1301,6 +1306,7 @@ static void sched_sim(void *scheduler) {
                     } else {
                         printk("THREAD ADMITTED\n");
                         new->status = ADMITTED;
+			new->deadline = cur_time() + new->constraints->periodic.period;
                         enqueue_thread(sched->runnable, new);
                     }
 
@@ -1392,12 +1398,12 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
 
     for (i = 0; i < scheduler->runnable->size; i++) {
         rt_thread *s = scheduler->runnable->threads[i];
-        rt_thread_sim *d = (rt_thread_sim *)malloc(sizeof(rt_thread_sim));
+        rt_thread_sim *d = (rt_thread_sim *)MALLOC(sizeof(rt_thread_sim));
         d->type = s->type;
         d->q_type = s->q_type;
         d->status = ADMITTED;
 
-        rt_constraints *constraints = (rt_constraints *)malloc(sizeof(rt_constraints));
+        rt_constraints *constraints = (rt_constraints *)MALLOC(sizeof(rt_constraints));
         if (d->type == PERIODIC) {
             struct periodic_constraints constr = {(s->constraints->periodic.period), (s->constraints->periodic.slice)};
             constraints->periodic = constr;
@@ -1416,12 +1422,12 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
     printk("SCHEDULER APERIODIC SIZE IS %d\n", scheduler->aperiodic->size);
     for (i = 0; i < scheduler->aperiodic->size; i++) {
         rt_thread *s = scheduler->aperiodic->threads[i];
-        rt_thread_sim *d = (rt_thread_sim *)malloc(sizeof(rt_thread_sim));
+        rt_thread_sim *d = (rt_thread_sim *)MALLOC(sizeof(rt_thread_sim));
         d->type = s->type;
         d->q_type = s->q_type;
         d->status = ADMITTED;
 
-        rt_constraints *constraints = (rt_constraints *)malloc(sizeof(rt_constraints));
+        rt_constraints *constraints = (rt_constraints *)MALLOC(sizeof(rt_constraints));
         struct aperiodic_constraints constr = {(s->constraints->aperiodic.priority)};
         constraints->aperiodic = constr;
 
@@ -1436,12 +1442,12 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
 
     for (i = 0; i < scheduler->pending->size; i++) {
         rt_thread *s = scheduler->pending->threads[i];
-        rt_thread_sim *d = (rt_thread_sim *)malloc(sizeof(rt_thread_sim));
+        rt_thread_sim *d = (rt_thread_sim *)MALLOC(sizeof(rt_thread_sim));
         d->type = s->type;
         d->q_type = RUNNABLE_QUEUE;
         d->status = ADMITTED;
 
-        rt_constraints *constraints = (rt_constraints *)malloc(sizeof(rt_constraints));
+        rt_constraints *constraints = (rt_constraints *)MALLOC(sizeof(rt_constraints));
         if (d->type == PERIODIC) {
             struct periodic_constraints constr = {(s->constraints->periodic.period), (s->constraints->periodic.slice)};
             constraints->periodic = constr;
@@ -1464,12 +1470,12 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
         enqueue_thread_logic(simulator->runnable, d);
     }
 
-    rt_thread_sim *new_sim = (rt_thread_sim *)malloc(sizeof(rt_thread_sim));
+    rt_thread_sim *new_sim = (rt_thread_sim *)MALLOC(sizeof(rt_thread_sim));
     new_sim->type = new->type;
     new_sim->q_type = RUNNABLE_QUEUE;
     new_sim->status = ADMITTED;
 
-    rt_constraints *constraints = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     if (new->type == PERIODIC) {
         struct periodic_constraints constr = {(new->constraints->periodic.period), (new->constraints->periodic.slice)};
         constraints->periodic = constr;
@@ -1490,12 +1496,12 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
 
     enqueue_thread_logic(simulator->runnable, new_sim);
 
-    rt_thread_sim *sched_per = (rt_thread_sim *)malloc(sizeof(rt_thread_sim));
+    rt_thread_sim *sched_per = (rt_thread_sim *)MALLOC(sizeof(rt_thread_sim));
     sched_per->type = this->type;
     sched_per->q_type = RUNNABLE_QUEUE;
     sched_per->status = ADMITTED;
 
-    rt_constraints *sched_con = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *sched_con = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     if (this->type == PERIODIC) {
         struct periodic_constraints constr = {(this->constraints->periodic.period), (this->constraints->periodic.slice)};
         sched_con->periodic = constr;
@@ -1520,20 +1526,20 @@ static void copy_threads_sim(rt_simulator *simulator, rt_scheduler *scheduler, r
 static void free_threads_sim(rt_simulator *simulator) {
     int i = 0;
     for (i = 0; i < simulator->runnable->size; i++) {
-        free(simulator->runnable->threads[i]->constraints);
-        free(simulator->runnable->threads[i]);
+        FREE(simulator->runnable->threads[i]->constraints);
+        FREE(simulator->runnable->threads[i]);
     }
     simulator->runnable->size = 0;
 
     for (i = 0; i < simulator->aperiodic->size; i++) {
-        free(simulator->aperiodic->threads[i]->constraints);
-        free(simulator->aperiodic->threads[i]);
+        FREE(simulator->aperiodic->threads[i]->constraints);
+        FREE(simulator->aperiodic->threads[i]);
     }
     simulator->aperiodic->size = 0;
 
     for (i = 0; i < simulator->pending->size; i++) {
-        free(simulator->pending->threads[i]->constraints);
-        free(simulator->pending->threads[i]);
+        FREE(simulator->pending->threads[i]->constraints);
+        FREE(simulator->pending->threads[i]);
     }
     simulator->pending->size = 0;
 }
@@ -1700,35 +1706,35 @@ void nk_rt_test()
     
     
     
-    rt_constraints *constraints_first = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_first = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_first = {(10000000000), (10000000)};
     constraints_first->periodic = per_constr_first;
     
-    rt_constraints *constraints_second = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_second = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_second = {(5000000000), (5000000)};
     constraints_second->periodic = per_constr_second;
     
-    rt_constraints *constraints_third = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_third = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_third = {(250000000), (250000)};
     constraints_third->periodic = per_constr_third;
     
-    rt_constraints *constraints_fifth = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_fifth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_fifth = {(500000000), (5000000)};
     constraints_fifth->periodic = per_constr_fifth;
     
-    rt_constraints *constraints_six = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_six = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_six = {(5000000000), (5000000)};
     constraints_six->periodic = per_constr_six;
     
-    rt_constraints *constraints_seven = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_seven = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_seven = {(5000000000), (5000000)};
     constraints_seven->periodic = per_constr_seven;
     
-    rt_constraints *constraints_fourth = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_fourth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct aperiodic_constraints aper_constr = {2};
     constraints_fourth->aperiodic = aper_constr;
     
-    rt_constraints *constraints_eighth = (rt_constraints *)malloc(sizeof(rt_constraints));
+    rt_constraints *constraints_eighth = (rt_constraints *)MALLOC(sizeof(rt_constraints));
     struct periodic_constraints per_constr_eighth = {(500000000000), (500000000)};
     constraints_eighth->periodic = per_constr_eighth;
 
